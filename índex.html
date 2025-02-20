@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <title>Escamot 3 de La Jonquera</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+    /* Capçalera gran */
+    .header {
+      text-align: center;
+      font-size: 36px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 10px 15px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #fff;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #eee;
+    }
+    .selected {
+      background-color: lightblue;
+    }
+    #addAssignment, #viewInventory {
+      display: block;
+      margin: 20px auto;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    /* Llistats */
+    #assignments, #inventoryDisplay {
+      list-style: none;
+      padding: 0;
+      text-align: center;
+    }
+    #assignments li {
+      padding: 8px 12px;
+      border-bottom: 1px dashed #ccc;
+      margin-bottom: 5px;
+    }
+    /* Modal per seleccionar Portàtil */
+    #portatilModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+    }
+    #portatilModalContent {
+      background: #fff;
+      padding: 20px;
+      max-width: 300px;
+      margin: 100px auto;
+      text-align: center;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Capçalera -->
+  <div class="header">Escamot 3 de La Jonquera</div>
+  
+  <div class="container">
+    <!-- Secció d'Indicatius disponibles -->
+    <div class="section" id="section-indicatius">
+      <h2>Indicatius Disponibles</h2>
+      <div class="buttons" id="indicatius">
+        <!-- Es generaran dinàmicament -->
+      </div>
+    </div>
+    
+    <!-- Secció d'AGENTS -->
+    <div class="section" id="section-agents">
+      <h2>AGENTS</h2>
+      <div class="buttons" id="agents">
+        <!-- Es generaran els botons dels agents fixos i "Nou Agent" -->
+      </div>
+    </div>
+    
+    <!-- Secció de Tablets disponibles -->
+    <div class="section" id="section-tablets">
+      <h2>Tablets Disponibles</h2>
+      <div class="buttons" id="tablets">
+        <!-- Es generaran dinàmicament -->
+      </div>
+    </div>
+    
+    <!-- Secció de Rodes disponibles -->
+    <div class="section" id="section-rodes">
+      <h2>Rodes Disponibles</h2>
+      <div class="buttons" id="rodes">
+        <!-- Es generaran dinàmicament -->
+      </div>
+    </div>
+    
+    <!-- Botó per afegir assignació -->
+    <div class="section">
+      <button id="addAssignment">Afegir Assignació</button>
+    </div>
+    
+    <!-- Llistat d'assignacions realitzades -->
+    <div class="section">
+      <h2>Indicatius operatius</h2>
+      <ul id="assignments">
+        <!-- Es mostraran les assignacions -->
+      </ul>
+    </div>
+    
+    <!-- Secció per veure els recursos no assignats -->
+    <div class="section" id="inventorySection">
+      <button id="viewInventory">NO Asignats</button>
+      <div id="inventoryDisplay"></div>
+    </div>
+  </div>
+  
+  <!-- Modal per seleccionar Portàtil (per als agents) -->
+  <div id="portatilModal">
+    <div id="portatilModalContent">
+      <h3 id="portatilModalTitle"></h3>
+      <div id="portatilOptions" class="buttons" style="justify-content: center; flex-wrap: wrap;"></div>
+      <button onclick="hidePortatilModal()">Cancel·lar</button>
+    </div>
+  </div>
+  
+  <script>
+    /* INVENTARI GLOBAL */
+    let availableIndicatius = ["Neulós 0", "Neulós 100", "Neulós 10", "Neulós 20", "Neulós 30", "Neulos Argot", "Neulós Custodia"];
+    const fixedAgents = ["18541", "18277", "21747", "23671", "24178", "24329", "24368", "24478"];
+    let availablePortatils = [100, 101, 102, 103, 104, 105, 106, 107, 110, 902];
+    let availableTablets = [1595, 3368, 3199];  // He corregit 3362 per 3368
+    let availableRodes = [8009, 2442, 5731, 8405];
+    
+    /* SELECCIONS DE L'ASSIGNACIÓ ACTUAL */
+    let selectedIndicatiu = null;   // de "Indicatius"
+    let selectedTablet = null;       // de "Tablets" (ara és opcional)
+    let selectedRoda = null;         // opcional
+    let selectedAgents = [];         // array d'objectes: { id: String, portatil: Number }
+    
+    /* ARRAY D'ASSIGNACIONS REALITZADES */
+    let assignments = []; // Cada assignació: { indicatiu, tablet, roda (opcional), agents: [ { id, portatil } ] }
+    
+    /* FUNCIONS PER ACTUALITZAR LA INTERFICIE */
+    
+    // Indicatius
+    function updateIndicatiusUI() {
+      const container = document.getElementById("indicatius");
+      container.innerHTML = "";
+      if (availableIndicatius.length === 0) {
+        container.textContent = "No hi ha indicatius disponibles.";
+      } else {
+        availableIndicatius.forEach(ind => {
+          const btn = document.createElement("button");
+          btn.textContent = ind;
+          if (selectedIndicatiu === ind) btn.classList.add("selected");
+          btn.addEventListener("click", () => {
+            selectedIndicatiu = ind;
+            updateIndicatiusUI();
+          });
+          container.appendChild(btn);
+        });
+      }
+      // Botó per afegir un indicatiu nou manual
+      const addBtn = document.createElement("button");
+      addBtn.textContent = "Altre Indicatiu";
+      addBtn.addEventListener("click", () => {
+        const nouIndicatiu = prompt("Introdueix el nou indicatiu:");
+        if (nouIndicatiu && nouIndicatiu.trim() !== "") {
+          availableIndicatius.push(nouIndicatiu.trim());
+          updateIndicatiusUI();
+        }
+      });
+      container.appendChild(addBtn);
+    }
+    
+    // Agents
+    function updateAgentsUI() {
+      const container = document.getElementById("agents");
+      container.innerHTML = "";
+      fixedAgents.forEach(agentId => {
+        const existing = selectedAgents.find(a => a.id === agentId);
+        const btn = document.createElement("button");
+        if (existing) {
+          btn.textContent = agentId + " (Portàtil: " + existing.portatil + ")";
+          btn.classList.add("selected");
+          btn.addEventListener("click", () => {
+            selectedAgents = selectedAgents.filter(a => a.id !== agentId);
+            updateAgentsUI();
+          });
+        } else {
+          btn.textContent = agentId;
+          btn.addEventListener("click", () => {
+            showPortatilModal(agentId);
+          });
+        }
+        container.appendChild(btn);
+      });
+      // Botó per afegir un agent nou
+      const newAgentBtn = document.createElement("button");
+      newAgentBtn.textContent = "Nou Agent";
+      newAgentBtn.addEventListener("click", () => {
+        if (selectedAgents.length >= 3) {
+          alert("Ja has seleccionat 3 agents.");
+          return;
+        }
+        const agentNum = prompt("Introdueix el número d'agent:");
+        if (agentNum && agentNum.trim() !== "") {
+          const agentId = agentNum.trim();
+          if (selectedAgents.find(a => a.id === agentId)) {
+            alert("Aquest agent ja està seleccionat.");
+            return;
+          }
+          showPortatilModal(agentId);
+        }
+      });
+      container.appendChild(newAgentBtn);
+    }
+    
+    // Tablets
+    function updateTabletsUI() {
+      const container = document.getElementById("tablets");
+      container.innerHTML = "";
+      if (availableTablets.length === 0) {
+        container.textContent = "No hi ha tablets disponibles.";
+        return;
+      }
+      availableTablets.forEach(tab => {
+        const btn = document.createElement("button");
+        btn.textContent = tab;
+        if (selectedTablet === tab) btn.classList.add("selected");
+        btn.addEventListener("click", () => {
+          // Si ja està seleccionada, la deseleccionem
+          if (selectedTablet === tab) {
+            selectedTablet = null;
+          } else {
+            selectedTablet = tab;
+          }
+          updateTabletsUI();
+        });
+        container.appendChild(btn);
+      });
+    }
+    
+    // Rodes
+    function updateRodesUI() {
+      const container = document.getElementById("rodes");
+      container.innerHTML = "";
+      if (availableRodes.length > 0) {
+        availableRodes.forEach(rod => {
+          const btn = document.createElement("button");
+          btn.textContent = rod;
+          if (selectedRoda === rod) btn.classList.add("selected");
+          btn.addEventListener("click", () => {
+            selectedRoda = rod;
+            updateRodesUI();
+          });
+          container.appendChild(btn);
+        });
+      } else {
+        container.textContent = "No hi ha rodes disponibles.";
+      }
+      // Botó per afegir un vehicle nou
+      const newVehicleBtn = document.createElement("button");
+      newVehicleBtn.textContent = "Nou vehicle";
+      newVehicleBtn.addEventListener("click", () => {
+        const vehicle = prompt("Introdueix el número del vehicle:");
+        if (vehicle && vehicle.trim() !== "") {
+          const vehicleNum = vehicle.trim();
+          if (!availableRodes.includes(vehicleNum)) {
+            availableRodes.push(vehicleNum);
+            updateRodesUI();
+          } else {
+            alert("Aquest vehicle ja existeix.");
+          }
+        }
+      });
+      container.appendChild(newVehicleBtn);
+    }
+    
+    /* MODAL PER SELECCIONAR PORTÀTIL (per als agents) */
+    function showPortatilModal(agentId) {
+      const usedPortatils = selectedAgents.map(a => a.portatil);
+      const portatilsAvailable = availablePortatils.filter(p => !usedPortatils.includes(p));
+      if (portatilsAvailable.length === 0) {
+        alert("No hi ha portàtils disponibles.");
+        return;
+      }
+      document.getElementById("portatilModalTitle").textContent = "Selecciona un portàtil per a l'agent " + agentId;
+      const optionsDiv = document.getElementById("portatilOptions");
+      optionsDiv.innerHTML = "";
+      portatilsAvailable.forEach(portatil => {
+        const btn = document.createElement("button");
+        btn.textContent = "Portàtil " + portatil;
+        btn.addEventListener("click", () => {
+          selectedAgents.push({ id: agentId, portatil: portatil });
+          hidePortatilModal();
+          updateAgentsUI();
+        });
+        optionsDiv.appendChild(btn);
+      });
+      document.getElementById("portatilModal").style.display = "block";
+    }
+    
+    function hidePortatilModal() {
+      document.getElementById("portatilModal").style.display = "none";
+    }
+    
+    /* ASSIGNACIÓ */
+    document.getElementById("addAssignment").addEventListener("click", () => {
+      if (selectedIndicatiu === null) {
+        alert("Selecciona un indicatiu.");
+        return;
+      }
+      // La tablet és opcional: si no s'ha seleccionat, s'indicarà "Sense tablet".
+      if (selectedAgents.length === 0) {
+        alert("Selecciona almenys 1 agent amb el seu portàtil.");
+        return;
+      }
+      // Construir l'assignació
+      const assignment = {
+        indicatiu: selectedIndicatiu,
+        tablet: selectedTablet, // pot ser null
+        roda: selectedRoda,     // pot ser null
+        agents: JSON.parse(JSON.stringify(selectedAgents))
+      };
+      assignments.push(assignment);
+      // Treure els recursos usats de l'inventari:
+      availableIndicatius = availableIndicatius.filter(ind => ind !== selectedIndicatiu);
+      if (selectedTablet !== null) {
+        availableTablets = availableTablets.filter(tab => tab !== selectedTablet);
+      }
+      if (selectedRoda !== null) {
+        availableRodes = availableRodes.filter(r => r !== selectedRoda);
+      }
+      selectedAgents.forEach(agent => {
+        availablePortatils = availablePortatils.filter(p => p !== agent.portatil);
+      });
+      // Reiniciar les seleccions
+      selectedIndicatiu = null;
+      selectedTablet = null;
+      selectedRoda = null;
+      selectedAgents = [];
+      
+      updateIndicatiusUI();
+      updateAgentsUI();
+      updateTabletsUI();
+      updateRodesUI();
+      updateAssignmentsUI();
+      updateInventoryDisplay();
+    });
+    
+    // Llistat d'assignacions (Indicatius operatius) i funció d'editar
+    function updateAssignmentsUI() {
+      const container = document.getElementById("assignments");
+      container.innerHTML = "";
+      assignments.forEach((assign, index) => {
+        const li = document.createElement("li");
+        let text = assign.indicatiu;
+        if (assign.tablet) {
+          text += " - Tablet: " + assign.tablet;
+        } else {
+          text += " - Sense tablet";
+        }
+        if (assign.roda) {
+          text += " - Roda: " + assign.roda;
+        } else {
+          text += " - Sense roda";
+        }
+        text += " - Agents: " + assign.agents.map(a => a.id + " (Portàtil: " + a.portatil + ")").join(", ");
+        li.textContent = text;
+        // Botó per editar l'assignació
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Editar";
+        editBtn.style.marginLeft = "10px";
+        editBtn.addEventListener("click", () => {
+          // Reintegra els recursos de l'assignació a l'inventari i elimina l'assignació
+          const assignToEdit = assignments[index];
+          availableIndicatius.push(assignToEdit.indicatiu);
+          if (assignToEdit.tablet) {
+            availableTablets.push(assignToEdit.tablet);
+          }
+          if (assignToEdit.roda) {
+            availableRodes.push(assignToEdit.roda);
+          }
+          assignToEdit.agents.forEach(agent => {
+            availablePortatils.push(agent.portatil);
+          });
+          // Elimina l'assignació
+          assignments.splice(index, 1);
+          // Carrega la selecció per editar-la
+          selectedIndicatiu = assignToEdit.indicatiu;
+          selectedTablet = assignToEdit.tablet;
+          selectedRoda = assignToEdit.roda || null;
+          selectedAgents = assignToEdit.agents;
+          updateIndicatiusUI();
+          updateAgentsUI();
+          updateTabletsUI();
+          updateRodesUI();
+          updateAssignmentsUI();
+          updateInventoryDisplay();
+        });
+        li.appendChild(editBtn);
+        container.appendChild(li);
+      });
+    }
+    
+    /* BOTÓ per veure els recursos no assignats (NO Asignats) */
+    document.getElementById("viewInventory").addEventListener("click", () => {
+      let msg = "<strong>Recursos no assignats:</strong><br>";
+      msg += "Indicatius: " + (availableIndicatius.length ? availableIndicatius.join(", ") : "Cap") + "<br>";
+      msg += "Tablets: " + (availableTablets.length ? availableTablets.join(", ") : "Cap") + "<br>";
+      msg += "Rodes: " + (availableRodes.length ? availableRodes.join(", ") : "Cap") + "<br>";
+      msg += "Portàtils: " + (availablePortatils.length ? availablePortatils.join(", ") : "Cap") + "<br>";
+      document.getElementById("inventoryDisplay").innerHTML = msg;
+    });
+    
+    /* ACTUALITZACIÓ INICIAL DE LA INTERFICIE */
+    updateIndicatiusUI();
+    updateAgentsUI();
+    updateTabletsUI();
+    updateRodesUI();
+    updateAssignmentsUI();
+  </script>
+</body>
+</html>
